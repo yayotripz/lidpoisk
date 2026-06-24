@@ -48,6 +48,7 @@ import { OnboardingTour, useResetOnboarding } from "@/components/leads/onboardin
 import { ScrollToTop } from "@/components/leads/scroll-to-top"
 import { ShareLeadDialog } from "@/components/leads/share-lead-dialog"
 import { Confetti } from "@/components/leads/confetti"
+import { RealSearchDialog } from "@/components/leads/real-search-dialog"
 import { useKeyboardShortcuts } from "@/lib/use-keyboard-shortcuts"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -778,6 +779,9 @@ export default function Home() {
                     </TabsTrigger>
                   </TabsList>
                 </Tabs>
+
+                {/* Кнопка живого поиска — видна на всех экранах */}
+                <RealSearchDialog />
 
                 {/* Переключатель вида: список / дашборд */}
                 {activeTab === "all" && (
