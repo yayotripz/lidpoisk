@@ -1,0 +1,79 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// Статусы лида: new | in_work | wrote | called | no_answer | refused | interesting | client
+// Хранится как строка для гибкости
+
+model Lead {
+  id            String   @id @default(cuid())
+  companyName   String
+  niche         String
+  country       String
+  city          String
+  address       String?
+  phone         String?
+  whatsapp      String?
+  telegram      String?
+  website       String?
+  rating        Float    @default(0)
+  reviewsCount  Int      @default(0)
+  problems      String   @default("[]") // JSON-массив ключей проблем
+  leadScore     Int      @default(0)
+  status        String   @default("new")
+  source        String   @default("manual")
+  companyType   String   @default("local") // any | small | local | chain | online
+  notes         String?  @default("")
+  tags          String   @default("[]") // JSON-массив пользовательских тегов
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  savedLeads    SavedLead[]
+  notesRelation LeadNote[]
+
+  @@index([niche])
+  @@index([country])
+  @@index([city])
+  @@index([status])
+  @@index([leadScore])
+}
+
+model LeadNote {
+  id        String   @id @default(cuid())
+  leadId    String
+  text      String
+  createdAt DateTime @default(now())
+
+  lead      Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([leadId])
+}
+
+model Search {
+  id               String   @id @default(cuid())
+  niche            String   @default("[]") // JSON
+  countries        String   @default("[]") // JSON
+  cities           String   @default("[]") // JSON
+  selectedProblems String   @default("[]") // JSON
+  companyType      String?
+  resultCount      Int      @default(0)
+  createdAt        DateTime @default(now())
+}
+
+model SavedLead {
+  id        String   @id @default(cuid())
+  leadId    String
+  createdAt DateTime @default(now())
+
+  lead      Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@unique([leadId])
+}

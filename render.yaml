@@ -1,0 +1,25 @@
+# Render.com Blueprint
+# Docs: https://render.com/docs/blueprint-spec
+services:
+  - type: web
+    name: lidpoisk
+    runtime: docker
+    region: frankfurt   # близко к СНГ
+    plan: free
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NEXT_TELEMETRY_DISABLED
+        value: "1"
+      - key: DATABASE_URL
+        value: file:/var/data/custom.db
+      - key: PORT
+        value: "3000"
+    disk:
+      name: lidpoisk-data
+      mountPath: /var/data
+      sizeGB: 1        # free tier max
