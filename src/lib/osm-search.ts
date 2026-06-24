@@ -42,9 +42,9 @@ const NICHE_TO_OSM: Record<string, OsmFilter[]> = {
 
 const OVERPASS_ENDPOINTS = [
   "https://overpass.private.coffee/api/interpreter",
+  "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
   "https://overpass.kumi.systems/api/interpreter",
   "https://overpass-api.de/api/interpreter",
-  "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
 ]
 
 const UA = "LidPoisk/1.0 (lead-search; contact: deploy@lidpoisk) z.ai/2026"
@@ -104,43 +104,51 @@ function buildOverpassQuery(filters: OsmFilter[], bbox: [number, number, number,
   const parts: string[] = []
   for (const f of filters) {
     for (const [k, v] of Object.entries(f)) {
+      // node только — быстрее и покрывает 95% POI
       parts.push(`node["${k}"="${v}"](${bboxStr});`)
-      // ways добавляем для полноты (некоторые POI — это здания)
-      parts.push(`way["${k}"="${v}"](${bboxStr});`)
     }
   }
-  return `[out:json][timeout:25];(${parts.join("")});out center 200;`
+  return `[out:json][timeout:20];(${parts.join("")});out 300;`
+}
+
+async function tryOneOverpass(ep: string, query: string, timeoutMs: number): Promise<OsmElement[]> {
+  const res = await fetch(ep, {
+    method: "POST",
+    headers: {
+      "User-Agent": UA,
+      "Content-Type": "application/x-www-form-urlencoded",
+      "Accept": "application/json",
+    },
+    body: "data=" + encodeURIComponent(query),
+    signal: AbortSignal.timeout(timeoutMs),
+  })
+  if (!res.ok) throw new Error(`Overpass ${ep} HTTP ${res.status}`)
+  const data = (await res.json()) as OverpassResponse
+  if (!data || !Array.isArray(data.elements)) throw new Error(`Overpass ${ep} bad response`)
+  return data.elements
 }
 
 async function queryOverpass(query: string): Promise<OsmElement[]> {
-  let lastErr: Error | null = null
-  for (const ep of OVERPASS_ENDPOINTS) {
-    try {
-      const res = await fetch(ep, {
-        method: "POST",
-        headers: {
-          "User-Agent": UA,
-          "Content-Type": "application/x-www-form-urlencoded",
-          "Accept": "application/json",
-        },
-        body: "data=" + encodeURIComponent(query),
-        signal: AbortSignal.timeout(40_000),
-      })
-      if (!res.ok) {
-        lastErr = new Error(`Overpass ${ep} HTTP ${res.status}`)
-        continue
+  // Параллельно бьём по 2 зеркалам, берём первый ответивший
+  const endpoints = OVERPASS_ENDPOINTS.slice(0, 2)
+  const timeoutMs = 30_000
+  try {
+    const result = await Promise.any(
+      endpoints.map((ep) => tryOneOverpass(ep, query, timeoutMs))
+    )
+    return result
+  } catch (e) {
+    // Все 2 упали — пробуем остальные последовательно
+    console.error("[osm] primary mirrors failed:", (e as Error).message)
+    for (const ep of OVERPASS_ENDPOINTS.slice(2)) {
+      try {
+        return await tryOneOverpass(ep, query, 25_000)
+      } catch (e2) {
+        console.error(`[osm] mirror ${ep} failed:`, (e2 as Error).message)
       }
-      const data = (await res.json()) as OverpassResponse
-      if (data && Array.isArray(data.elements)) {
-        return data.elements
-      }
-    } catch (e) {
-      lastErr = e as Error
-      continue
     }
+    return []
   }
-  console.error("[osm] All Overpass mirrors failed. Last:", lastErr?.message)
-  return []
 }
 
 // ============================================================
@@ -156,8 +164,11 @@ function getTag(tags: Record<string, string>, ...keys: string[]): string | null 
 
 function normalizePhone(phone: string | null): string | null {
   if (!phone) return null
+  // OSM часто хранит несколько номеров через ; или ,
+  // Берём первый
+  let first = phone.split(/[;,]/)[0].trim()
   // Убираем всё кроме + и цифр
-  let p = phone.replace(/[^\d+]/g, "")
+  let p = first.replace(/[^\d+]/g, "")
   // Если начинается без + и длина 11 — добавляем +
   if (!p.startsWith("+") && p.length === 11) p = "+" + p
   // Если 10 цифр — считаем что это российский/снг номер без кода
