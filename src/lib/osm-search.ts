@@ -313,6 +313,7 @@ export type RealSearchParams = {
   country?: string     // страна (опционально, для дизамбигуации)
   limit?: number       // максимум результатов (default 100)
   saveToDb?: boolean   // сохранять в БД (default true)
+  excludeOsmIds?: string[]
 }
 
 export type RealSearchResult = {
@@ -373,6 +374,9 @@ export async function searchRealLeads(params: RealSearchParams): Promise<RealSea
   const seenNames = new Set<string>()
 
   for (const el of elements) {
+    if (params.excludeOsmIds && (params.excludeOsmIds.includes(`node-${el.id}`) || params.excludeOsmIds.includes(el.id.toString()))) {
+      continue
+    }
     // way → берём center координаты (Overpass out center)
     if (el.type === "way" && !el.lat && (el as { center?: { lat: number; lon: number } }).center) {
       // уже есть center

@@ -3,12 +3,63 @@ import { db } from "@/lib/db"
 
 export const dynamic = "force-dynamic"
 
+
+// GET /api/admin/dedup — быстрая проверка на дубли (dry-run)
+export async function GET() {
+  try {
+    const allLeads = await db.lead.findMany({
+      select: { id: true, companyName: true, phone: true, city: true, niche: true, leadScore: true },
+      orderBy: { createdAt: 'asc' },
+    })
+
+    const normName = (s: string) => s.toLowerCase().replace(/[^a-zа-я0-9]/gi, '')
+    const normPhone = (s: string | null) => (s ? s.replace(/\D/g, '').slice(-10) : '')
+
+    const groups = new Map()
+    for (const lead of allLeads) {
+      const key = normName(lead.companyName) + '|' + normPhone(lead.phone)
+      if (!groups.has(key)) groups.set(key, [])
+      groups.get(key).push(lead)
+    }
+
+    const duplicates: any[] = []
+    for (const [, group] of groups) {
+      if (group.length <= 1) continue
+      duplicates.push({ name: group[0].companyName, count: group.length, city: group[0].city })
+    }
+
+    return NextResponse.json({ totalGroups: duplicates.length, duplicates, totalLeads: allLeads.length })
+  } catch (e) {
+    console.error('[admin/dedup] GET error', e)
+    return NextResponse.json({ error: 'Ошибка проверки дублей' }, { status: 500 })
+  }
+}
+
 // POST /api/admin/dedup — поиск и удаление дублей лидов
 // Дубли: совпадение по нормализованному телефону + названию (case-insensitive)
 // Возвращает найденные группы дублей и количество удалённых
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json().catch(() => ({}))
+    let body: any = {}
+    const contentType = req.headers.get("content-type") || ""
+    if (contentType.includes("application/json")) {
+      body = await req.json().catch(() => ({}))
+    } else if (contentType.includes("application/x-www-form-urlencoded") || contentType.includes("multipart/form-data")) {
+      const formData = await req.formData().catch(() => null)
+      if (formData) {
+        body = {}
+        formData.forEach((value, key) => {
+          body[key] = value
+        })
+      }
+    } else {
+      const text = await req.text().catch(() => "")
+      try {
+        body = JSON.parse(text)
+      } catch {
+        body = {}
+      }
+    }
     const dryRun = body.dryRun !== false // по умолчанию только анализ
 
     const allLeads = await db.lead.findMany({

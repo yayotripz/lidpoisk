@@ -313,17 +313,17 @@ export function RealSearchDialog() {
                 </div>
               )}
 
-              {result.saved > 0 && (
+              {result.found > 0 && (
                 <Button
-                  variant="outline"
-                  className="w-full"
+                  variant="default"
+                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-medium"
                   onClick={() => {
                     setOpen(false)
                     // Триггерим основной поиск чтобы показать новые лиды
                     window.dispatchEvent(new CustomEvent("trigger-main-search"))
                   }}
                 >
-                  Показать в основном списке →
+                  Показать результаты в списке →
                 </Button>
               )}
             </div>

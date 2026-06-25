@@ -32,7 +32,26 @@ export async function POST(
 ) {
   try {
     const { id } = await params
-    const body = await req.json().catch(() => ({}))
+    let body: any = {}
+    const contentType = req.headers.get("content-type") || ""
+    if (contentType.includes("application/json")) {
+      body = await req.json().catch(() => ({}))
+    } else if (contentType.includes("application/x-www-form-urlencoded") || contentType.includes("multipart/form-data")) {
+      const formData = await req.formData().catch(() => null)
+      if (formData) {
+        body = {}
+        formData.forEach((value, key) => {
+          body[key] = value
+        })
+      }
+    } else {
+      const text = await req.text().catch(() => "")
+      try {
+        body = JSON.parse(text)
+      } catch {
+        body = {}
+      }
+    }
     const rawTag = typeof body.tag === "string" ? body.tag : ""
     const tag = normalizeTag(rawTag)
     if (!tag) {
