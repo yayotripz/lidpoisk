@@ -56,7 +56,7 @@ export function Toaster() {
             </div>
             {action}
             <ToastClose />
-            <ToastProgress variant={variant} />
+            <ToastProgress variant={variant || undefined} />
           </Toast>
         )
       })}

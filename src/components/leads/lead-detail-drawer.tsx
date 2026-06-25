@@ -257,21 +257,21 @@ export function LeadDetailDrawer({
                   icon={<Phone className="size-4" />}
                   label="Телефон"
                   value={lead.phone || "не указан"}
-                  href={tel}
+                  href={tel || undefined}
                   tone={lead.phone ? "primary" : "muted"}
                 />
                 <ContactRow
                   icon={<MessageCircle className="size-4" />}
                   label="WhatsApp"
                   value={lead.whatsapp || (lead.phone ? "по номеру телефона" : "не найден")}
-                  href={wa}
+                  href={wa || undefined}
                   tone={wa ? "emerald" : "muted"}
                 />
                 <ContactRow
                   icon={<Send className="size-4" />}
                   label="Telegram"
                   value={lead.telegram || "не найден"}
-                  href={tg}
+                  href={tg || undefined}
                   tone={tg ? "sky" : "muted"}
                 />
                 <ContactRow

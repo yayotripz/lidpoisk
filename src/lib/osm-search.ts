@@ -254,7 +254,7 @@ async function saveToDatabase(
   let duplicates = 0
   for (const l of leads) {
     // Дедупликация по телефону (если есть) или по имени+городу
-    let existing = null
+    let existing: { id: string } | null = null
     if (l.phone) {
       existing = await db.lead.findFirst({
         where: {

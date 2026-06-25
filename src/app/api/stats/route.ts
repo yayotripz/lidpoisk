@@ -20,30 +20,30 @@ export async function GET() {
       by: ["status"],
       _count: { _all: true },
     })
-    const byStatus = statusRows.reduce<Record<string, number>>((acc, r) => {
-      acc[r.status] = r._count._all
-      return acc
-    }, {})
+    const byStatus: Record<string, number> = {}
+    for (const r of statusRows) {
+      byStatus[r.status] = r._count._all
+    }
 
     // Ниша
     const nicheRows = await db.lead.groupBy({
       by: ["niche"],
       _count: { _all: true },
     })
-    const byNiche = nicheRows.reduce<Record<string, number>>((acc, r) => {
-      acc[r.niche] = r._count._all
-      return acc
-    }, {})
+    const byNiche: Record<string, number> = {}
+    for (const r of nicheRows) {
+      byNiche[r.niche] = r._count._all
+    }
 
     // Страна
     const countryRows = await db.lead.groupBy({
       by: ["country"],
       _count: { _all: true },
     })
-    const byCountry = countryRows.reduce<Record<string, number>>((acc, r) => {
-      acc[r.country] = r._count._all
-      return acc
-    }, {})
+    const byCountry: Record<string, number> = {}
+    for (const r of countryRows) {
+      byCountry[r.country] = r._count._all
+    }
 
     // Город — топ-30 для тепловой карты
     const cityRows = await db.lead.groupBy({
