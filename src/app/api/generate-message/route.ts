@@ -15,7 +15,26 @@ export const maxDuration = 30
 // Возвращает: { message, subject, services, source: "ai" | "template" }
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json().catch(() => ({}))
+    let body: any = {}
+    const contentType = req.headers.get("content-type") || ""
+    if (contentType.includes("application/json")) {
+      body = await req.json().catch(() => ({}))
+    } else if (contentType.includes("application/x-www-form-urlencoded") || contentType.includes("multipart/form-data")) {
+      const formData = await req.formData().catch(() => null)
+      if (formData) {
+        body = {}
+        formData.forEach((value, key) => {
+          body[key] = value
+        })
+      }
+    } else {
+      const text = await req.text().catch(() => "")
+      try {
+        body = JSON.parse(text)
+      } catch {
+        body = {}
+      }
+    }
 
     let lead: {
       companyName: string
@@ -45,7 +64,7 @@ export async function POST(req: NextRequest) {
         website: row.website,
         phone: row.phone,
       }
-    } else if (body.lead) {
+    } else if (body.lead && typeof body.lead === "object") {
       lead = body.lead
       lead.problems = Array.isArray(lead.problems) ? lead.problems : []
     } else {
@@ -80,13 +99,6 @@ export async function POST(req: NextRequest) {
     const nicheLabel = getNicheLabel(lead.niche)
     const countryLabel = getCountryLabel(lead.country)
 
-    // Пытаемся сначала z-ai SDK (если доступен)
-    let aiMessage: string | null = null
-    let aiSubject: string | null = null
-    try {
-      const ZAIModule = await import("z-ai-web-dev-sdk")
-      const ZAI = ZAIModule.default
-      const zai = await ZAI.create()
 
       const systemPrompt = `Ты — профессиональный продажник B2B для веб-агентства. Пишешь короткие, персонализированные сообщения для холодного аутрича в WhatsApp/Telegram компаниям из СНГ. Стиль: дружелюбный, конкретный, без воды. Сообщение должно быть коротким (3-5 предложений), на «вы», с конкретным предложением на основе проблем компании. Используй русский язык.`
 
@@ -112,37 +124,38 @@ export async function POST(req: NextRequest) {
 7. В конце добавь подпись: «— Команда ЛидПоиск».
 
 Верни ТОЛЬКО текст сообщения, без пояснений и markdown.`
-
-      const completion = await zai.chat.completions.create({
+    // Используем DeepSeek AI (бесплатная Llama 3.3 70B) для AI-генерации
+    let aiMessage: string | null = null
+    let aiSubject: string | null = null
+    try {
+      const aiBody = JSON.stringify({
+        model: "deepseek-chat",
         messages: [
-          { role: "assistant", content: systemPrompt },
-          { role: "user", content: userPrompt },
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt }
         ],
-        thinking: { type: "disabled" },
+        temperature: 0.7,
+        max_tokens: 300
       })
-      aiMessage = completion.choices[0]?.message?.content?.trim() || null
-
-      const subjectCompletion = await zai.chat.completions.create({
-        messages: [
-          {
-            role: "assistant",
-            content:
-              "Ты генерируешь очень короткие темы сообщений (3-6 слов) для холодного аутрича. Только текст, без кавычек.",
-          },
-          {
-            role: "user",
-            content: `Сгенерируй тему сообщения для компании «${lead.companyName}» (${nicheLabel}, ${lead.city}). Предлагаем: ${services[0]}.`,
-          },
-        ],
-        thinking: { type: "disabled" },
+      const aiResp = await fetch("https://api.deepseek.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer " + (process.env.DEEPSEEK_API_KEY || ""),
+          // Requires DEEPSEEK_API_KEY in .env
+        },
+        body: aiBody
       })
-      aiSubject =
-        subjectCompletion.choices[0]?.message?.content?.trim() ||
-        `Предложение для ${lead.companyName}`
+      if (aiResp.ok) {
+        const aiData = await aiResp.json()
+        aiMessage = aiData.choices?.[0]?.message?.content?.trim() || null
+        if (aiMessage) aiSubject = 'Предложение для ' + lead.companyName
+      }
+      if (!aiMessage) console.log('[generate-message] DeepSeek returned no message, falling back')
     } catch (sdkErr) {
-      console.log("[generate-message] z-ai SDK недоступен, используем шаблонизатор:", (sdkErr as Error).message)
+      console.log('[generate-message] AI API недоступен, используем шаблонизатор:', (sdkErr as Error).message)
     }
-
+    
     if (aiMessage) {
       return NextResponse.json({
         message: aiMessage,

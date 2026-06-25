@@ -62,7 +62,7 @@ import {
 } from "@/components/ui/sheet"
 import { useToast } from "@/hooks/use-toast"
 import { ToastAction } from "@/components/ui/toast"
-import { useLeadsStore } from "@/store/leads-store"
+import { useLeadsStore, type FiltersState } from "@/store/leads-store"
 import type { Lead, SearchFilters } from "@/lib/leads"
 import { getNicheLabel, getStatusLabel } from "@/lib/constants"
 
@@ -115,6 +115,7 @@ export default function Home() {
     setSort,
     adminOpen,
     setAdminOpen,
+    setRealSearchOpen,
   } = useLeadsStore()
   const [loadingStage, setLoadingStage] = React.useState(0)
   const [isSearching, setIsSearching] = React.useState(false)
@@ -250,8 +251,8 @@ export default function Home() {
     setMobileFiltersOpen(false)
     setSelectedIds(new Set())
     setSelectMode(false)
-    fetchLeads(filters, sort, true)
-  }, [filters, sort, fetchLeads])
+    setRealSearchOpen(true)
+  }, [setRealSearchOpen])
 
   // Автозапуск при монтировании
   React.useEffect(() => {
@@ -533,9 +534,18 @@ export default function Home() {
   // --- Восстановление фильтров из истории ---
   const handleRestoreFilters = React.useCallback(
     (restored: SearchFilters) => {
-      setFilters(restored)
+      const fullFilters: FiltersState = {
+        niche: restored.niche ?? [],
+        countries: restored.countries ?? [],
+        cities: restored.cities ?? [],
+        problems: restored.problems ?? [],
+        companyType: restored.companyType ?? "any",
+        page: restored.page ?? 1,
+        query: restored.query ?? "",
+      }
+      setFilters(fullFilters)
       setMobileFiltersOpen(false)
-      fetchLeads(restored, sort, true)
+      fetchLeads(fullFilters, sort, true)
     },
     [setFilters, sort, fetchLeads]
   )

@@ -33,6 +33,9 @@ type LeadsStore = {
   // UI admin panel
   adminOpen: boolean
   setAdminOpen: (open: boolean) => void
+  // UI real search (internet)
+  realSearchOpen: boolean
+  setRealSearchOpen: (open: boolean) => void
 }
 
 const DEFAULT_FILTERS: FiltersState = {
@@ -76,4 +79,6 @@ export const useLeadsStore = create<LeadsStore>((set) => ({
   setView: (view) => set({ view }),
   adminOpen: false,
   setAdminOpen: (adminOpen) => set({ adminOpen }),
+  realSearchOpen: false,
+  setRealSearchOpen: (realSearchOpen) => set({ realSearchOpen }),
 }))

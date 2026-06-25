@@ -10,7 +10,7 @@ import { NICHES, COUNTRIES, COMPANY_TYPES, DATA_SOURCES } from "@/lib/constants"
 
 export const dynamic = "force-dynamic"
 
-// GET /api/leads — список лидов из базы (с опциональной пагинацией и фильтром статуса)
+// GET /api/leads — список лидов из базы (с пагинацией, фильтром статуса/ниши и поиском)
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url)
@@ -18,10 +18,27 @@ export async function GET(req: NextRequest) {
     const pageSize = Math.min(100, Math.max(1, Number(searchParams.get("pageSize")) || 24))
     const status = searchParams.get("status") || undefined
     const niche = searchParams.get("niche") || undefined
+    const search = (searchParams.get("search") || "").trim()
 
     const where: Record<string, unknown> = {}
-    if (status) where.status = status
+    if (status) {
+      if (status === "saved") {
+        where.savedLeads = { some: {} }
+      } else {
+        where.status = status
+      }
+    }
     if (niche) where.niche = niche
+    // Server-side поиск по названию, городу или телефону —
+    // поддерживает кириллицу и латиницу (contains без mode: insensitive —
+    // SQLite не поддерживает insensitive, поэтому дополнительно фильтруем ниже).
+    if (search.length > 0) {
+      where.OR = [
+        { companyName: { contains: search } },
+        { city: { contains: search } },
+        { phone: { contains: search } },
+      ]
+    }
 
     const [total, rows] = await Promise.all([
       db.lead.count({ where }),
@@ -49,7 +66,26 @@ export async function GET(req: NextRequest) {
 // POST /api/leads — создание нового лида (ручное добавление)
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json().catch(() => ({}))
+    let body: any = {}
+    const contentType = req.headers.get("content-type") || ""
+    if (contentType.includes("application/json")) {
+      body = await req.json().catch(() => ({}))
+    } else if (contentType.includes("application/x-www-form-urlencoded") || contentType.includes("multipart/form-data")) {
+      const formData = await req.formData().catch(() => null)
+      if (formData) {
+        body = {}
+        formData.forEach((value, key) => {
+          body[key] = value
+        })
+      }
+    } else {
+      const text = await req.text().catch(() => "")
+      try {
+        body = JSON.parse(text)
+      } catch {
+        body = {}
+      }
+    }
 
     // Валидация
     const companyName = String(body.companyName || "").trim()
