@@ -115,6 +115,7 @@ export default function Home() {
     setSort,
     adminOpen,
     setAdminOpen,
+    setRealSearchOpen,
   } = useLeadsStore()
   const [loadingStage, setLoadingStage] = React.useState(0)
   const [isSearching, setIsSearching] = React.useState(false)
@@ -250,8 +251,8 @@ export default function Home() {
     setMobileFiltersOpen(false)
     setSelectedIds(new Set())
     setSelectMode(false)
-    fetchLeads(filters, sort, true)
-  }, [filters, sort, fetchLeads])
+    setRealSearchOpen(true)
+  }, [setRealSearchOpen])
 
   // Автозапуск при монтировании
   React.useEffect(() => {

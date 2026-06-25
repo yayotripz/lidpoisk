@@ -25,6 +25,7 @@ import {
 import { useToast } from "@/hooks/use-toast"
 import { NICHES, getNicheLabel } from "@/lib/constants"
 import { useQueryClient } from "@tanstack/react-query"
+import { useLeadsStore } from "@/store/leads-store"
 
 type RealSearchResponse = {
   ok: boolean
@@ -56,7 +57,7 @@ type RealSearchResponse = {
 }
 
 export function RealSearchDialog() {
-  const [open, setOpen] = React.useState(false)
+  const { realSearchOpen: open, setRealSearchOpen: setOpen, filters } = useLeadsStore()
   const [loading, setLoading] = React.useState(false)
   const [result, setResult] = React.useState<RealSearchResponse | null>(null)
   const [niche, setNiche] = React.useState("restaurants")
@@ -64,6 +65,14 @@ export function RealSearchDialog() {
   const [country, setCountry] = React.useState("russia")
   const { toast } = useToast()
   const qc = useQueryClient()
+
+  // Sync with sidebar filters when opening
+  React.useEffect(() => {
+    if (open) {
+      if (filters.niche[0]) setNiche(filters.niche[0])
+      if (filters.cities[0]) setCity(filters.cities[0])
+    }
+  }, [open, filters.niche, filters.cities])
 
   async function handleSearch() {
     if (!city.trim()) {
